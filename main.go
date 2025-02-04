@@ -1,6 +1,8 @@
 package main
 
 import (
+	"encoding/json"
+	"fmt"
 	utils "go-tus-server/utils"
 	"log"
 	"net/http"
@@ -13,26 +15,45 @@ import (
 	tusd "github.com/tus/tusd/v2/pkg/handler"
 )
 
+type Config struct {
+	AllowOrigins []string `json:"AllowOrigins"`
+}
+
 func main() {
-	// Step 1: Initialize Gin
-	router := gin.Default()
 
-	// Step 1: Set up CORS middleware
-	// router.Use(cors.Default()) // Allows all origins by default
-
-	// Alternatively, for custom CORS configuration:
-	router.Use(cors.New(cors.Config{
-		AllowCredentials: true, // Allow credentials (cookies, etc.)
-		AllowOrigins:     []string{"http://localhost:5173"},
-		AllowMethods:     []string{"*"},
-		AllowHeaders:     []string{"*"},
-	}))
-
-	// Step 2: Set up the upload and final directories
+	// Step 1: Set up the temporary upload directories
 	tempUploadDir := "C:\\TUS-Server\\uploads"
 
 	if _, err := os.Stat(tempUploadDir); os.IsNotExist(err) {
 		os.MkdirAll(tempUploadDir, os.ModePerm)
+	}
+
+	// Read config file
+	configFilePath := "C:\\TUS-Server\\config.json"
+	config := Config{}
+	configFile, err := os.ReadFile(configFilePath)
+	if err != nil {
+		log.Fatalf("Failed to read config file: %v", err)
+	}
+	err = json.Unmarshal(configFile, &config)
+	if err != nil {
+		log.Fatalf("Failed to parse config file: %v", err)
+	}
+
+	// Step 2: Initialize Gin
+	router := gin.Default()
+
+	// Set up CORS middleware
+	if len(config.AllowOrigins) == 0 {
+		router.Use(cors.Default())
+	} else {
+		fmt.Println("Allowed origins : ", config.AllowOrigins)
+		router.Use(cors.New(cors.Config{
+			AllowCredentials: true, // Allow credentials (cookies, etc.)
+			AllowOrigins:     config.AllowOrigins,
+			AllowMethods:     []string{"*"},
+			AllowHeaders:     []string{"*"},
+		}))
 	}
 
 	// Step 3: Configure TUS server
